@@ -1,6 +1,16 @@
 require("dotenv").config();
-const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
+const express = require("express");
+const { Client, GatewayIntentBits, EmbedBuilder, REST, Routes } = require("discord.js");
 const { Pool } = require("pg");
+
+const app = express();
+const PORT = 3000;
+
+// Express server to keep bot alive on Render
+app.get("/", (req, res) => {
+  res.send("Bot is running.");
+});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
 const client = new Client({
   intents: [
@@ -80,14 +90,38 @@ client.on("messageCreate", async (message) => {
   }
 });
 
-// Command to show the bump leaderboard
-client.on("messageCreate", async (message) => {
-  if (message.content === "!brank") {
+// Slash command setup
+const commands = [
+  {
+    name: "brank",
+    description: "Displays the bump leaderboard",
+  },
+];
+
+const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
+
+client.once("ready", async () => {
+  console.log(`Logged in as ${client.user.tag}`);
+
+  try {
+    console.log("Registering slash commands...");
+    await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
+    console.log("Slash commands registered.");
+  } catch (err) {
+    console.error("Error registering slash commands:", err);
+  }
+});
+
+// Handle slash commands
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isCommand()) return;
+
+  if (interaction.commandName === "brank") {
     try {
       const res = await pool.query(`SELECT username, count FROM bumps ORDER BY count DESC LIMIT 10`);
 
       if (res.rows.length === 0) {
-        return message.channel.send("No bumps recorded yet.");
+        return interaction.reply("No bumps recorded yet.");
       }
 
       const leaderboard = res.rows
@@ -100,10 +134,10 @@ client.on("messageCreate", async (message) => {
         .setDescription(leaderboard)
         .setFooter({ text: "Keep bumping to climb the leaderboard!" });
 
-      message.channel.send({ embeds: [embed] });
+      interaction.reply({ embeds: [embed] });
     } catch (err) {
       console.error("Database error:", err.message);
-      message.channel.send("Error retrieving leaderboard.");
+      interaction.reply("Error retrieving leaderboard.");
     }
   }
 });
