@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const { Client, GatewayIntentBits, EmbedBuilder, REST, Routes } = require("discord.js");
-const { Pool } = require("pg");
+const sqlite3 = require("sqlite3").verbose();
 
 const app = express();
 const PORT = 3000;
@@ -20,48 +20,30 @@ const client = new Client({
   ],
 });
 
-// PostgreSQL connection setup
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-  idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
-});
-
-// Auto-reconnect on database errors
-pool.on("error", async (err) => {
-  console.error("Database connection lost. Attempting to reconnect...", err);
-  try {
-    await pool.query("SELECT 1");
-    console.log("Database reconnected successfully.");
-  } catch (error) {
-    console.error("Reconnection attempt failed:", error);
+// SQLite database connection
+const db = new sqlite3.Database("database.sqlite", (err) => {
+  if (err) {
+    console.error("❌ Error opening SQLite database:", err.message);
+  } else {
+    console.log("✅ Connected to SQLite database.");
   }
 });
-
-// Keep the database connection alive
-setInterval(async () => {
-  try {
-    await pool.query("SELECT now()");
-  } catch (err) {
-    console.error("Database keep-alive failed:", err);
-  }
-}, 120000); // 2 minutes
 
 // Ensure `bumps` table exists
-(async () => {
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS bumps (
-        userId TEXT PRIMARY KEY,
-        username TEXT,
-        count INTEGER DEFAULT 0
-      )
-    `);
-    console.log("Bump table ensured.");
-  } catch (err) {
-    console.error("Failed to initialize database:", err.message);
+db.run(
+  `CREATE TABLE IF NOT EXISTS bumps (
+    userId TEXT PRIMARY KEY,
+    username TEXT,
+    count INTEGER DEFAULT 0
+  )`,
+  (err) => {
+    if (err) {
+      console.error("❌ Failed to initialize SQLite table:", err.message);
+    } else {
+      console.log("✅ Bump table ensured in SQLite.");
+    }
   }
-})();
+);
 
 // Bump bot ID and message
 const BUMP_BOT_ID = "735147814878969968";
@@ -76,17 +58,25 @@ client.on("messageCreate", async (message) => {
     const userId = mentionedUser.id;
     const username = mentionedUser.username;
 
-    try {
-      const res = await pool.query(`SELECT count FROM bumps WHERE userId = $1`, [userId]);
-
-      if (res.rows.length > 0) {
-        await pool.query(`UPDATE bumps SET count = count + 1 WHERE userId = $1`, [userId]);
-      } else {
-        await pool.query(`INSERT INTO bumps (userId, username, count) VALUES ($1, $2, 1)`, [userId, username]);
+    db.get(`SELECT count FROM bumps WHERE userId = ?`, [userId], (err, row) => {
+      if (err) {
+        return console.error("❌ Error fetching bump count:", err.message);
       }
-    } catch (err) {
-      console.error("Database error:", err.message);
-    }
+
+      if (row) {
+        db.run(`UPDATE bumps SET count = count + 1 WHERE userId = ?`, [userId], (err) => {
+          if (err) {
+            console.error("❌ Error updating bump count:", err.message);
+          }
+        });
+      } else {
+        db.run(`INSERT INTO bumps (userId, username, count) VALUES (?, ?, 1)`, [userId, username], (err) => {
+          if (err) {
+            console.error("❌ Error inserting bump:", err.message);
+          }
+        });
+      }
+    });
   }
 });
 
@@ -106,9 +96,9 @@ client.once("ready", async () => {
   try {
     console.log("Registering slash commands...");
     await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-    console.log("Slash commands registered.");
+    console.log("✅ Slash commands registered.");
   } catch (err) {
-    console.error("Error registering slash commands:", err);
+    console.error("❌ Error registering slash commands:", err);
   }
 });
 
@@ -117,14 +107,17 @@ client.on("interactionCreate", async (interaction) => {
   if (!interaction.isCommand()) return;
 
   if (interaction.commandName === "brank") {
-    try {
-      const res = await pool.query(`SELECT username, count FROM bumps ORDER BY count DESC LIMIT 10`);
+    db.all(`SELECT username, count FROM bumps ORDER BY count DESC LIMIT 10`, [], (err, rows) => {
+      if (err) {
+        console.error("❌ Error retrieving leaderboard:", err.message);
+        return interaction.reply("Error retrieving leaderboard.");
+      }
 
-      if (res.rows.length === 0) {
+      if (rows.length === 0) {
         return interaction.reply("No bumps recorded yet.");
       }
 
-      const leaderboard = res.rows
+      const leaderboard = rows
         .map((entry, index) => `**${index + 1}.** ${entry.username} - **${entry.count} bumps**`)
         .join("\n");
 
@@ -135,10 +128,7 @@ client.on("interactionCreate", async (interaction) => {
         .setFooter({ text: "Keep bumping to climb the leaderboard!" });
 
       interaction.reply({ embeds: [embed] });
-    } catch (err) {
-      console.error("Database error:", err.message);
-      interaction.reply("Error retrieving leaderboard.");
-    }
+    });
   }
 });
 
