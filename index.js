@@ -2,10 +2,17 @@ require("dotenv").config();
 const { Client, GatewayIntentBits, SlashCommandBuilder, Routes } = require("discord.js");
 const { REST } = require("@discordjs/rest");
 const bump = require("./bump.js");
+const express = require("express");
 
 // ✅ Ensure required environment variables are set
 if (!process.env.TOKEN) throw new Error("❌ Missing TOKEN in environment variables!");
 if (!process.env.CLIENT_ID) throw new Error("❌ Missing CLIENT_ID in environment variables!");
+
+// ✅ Express server to keep the bot alive
+const app = express();
+const PORT = process.env.PORT || 3000;
+app.get("/", (req, res) => res.send("Frau Lingua is running!"));
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 
 const client = new Client({
     intents: [
