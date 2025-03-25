@@ -1,7 +1,11 @@
+require("dotenv").config();
 const { Client, GatewayIntentBits, SlashCommandBuilder, Routes } = require("discord.js");
 const { REST } = require("@discordjs/rest");
 const bump = require("./bump.js");
-require("dotenv").config();
+
+// ✅ Ensure required environment variables are set
+if (!process.env.TOKEN) throw new Error("❌ Missing TOKEN in environment variables!");
+if (!process.env.CLIENT_ID) throw new Error("❌ Missing CLIENT_ID in environment variables!");
 
 const client = new Client({
     intents: [
@@ -49,4 +53,6 @@ client.on("interactionCreate", async (interaction) => {
 });
 
 // ✅ Bot login
-client.login(process.env.TOKEN);
+client.login(process.env.TOKEN).catch((err) => {
+    console.error("❌ Failed to log in! Check TOKEN:", err);
+});
