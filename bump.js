@@ -27,7 +27,7 @@ const bumpCache = new Map();
     }
 })();
 
-const BUMP_BOT_ID = "540129267728515072";
+const BUMP_BOT_ID = "735147814878969968";
 const BUMP_MESSAGE = "Thx for bumping our Server! We will remind you in 2 hours!";
 
 // ✅ Function to track bump (cached, not immediate DB write)
@@ -48,8 +48,8 @@ module.exports.trackBump = async (message) => {
     }
 };
 
-// ✅ Function to save cached bumps to DB at 22:30 IST daily
-cron.schedule("58 20 * * *", async () => {
+// ✅ Function to save cached bumps to DB at 05:30 IST daily
+cron.schedule("30 05 * * *", async () => {
     console.log("⏳ Uploading bump data to database...");
 
     if (bumpCache.size === 0) {
