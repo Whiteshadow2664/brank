@@ -55,6 +55,7 @@ client.on("interactionCreate", async (interaction) => {
     if (!interaction.isCommand()) return;
 
     if (interaction.commandName === "brank") {
+        await interaction.deferReply(); // ✅ Acknowledge interaction first
         await bump.showLeaderboard(interaction);
     }
 });
