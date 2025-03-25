@@ -1,11 +1,12 @@
 {
   "name": "discord-bot",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A Discord bot to track bumps and display a leaderboard.",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "postinstall": "npm install node-cron --save"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
