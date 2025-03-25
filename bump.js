@@ -83,7 +83,7 @@ cron.schedule("46 20 * * *", async () => {
 }, { timezone: "Asia/Kolkata" }); // ✅ 22:30 IST
 
 // ✅ Function to fetch and display bump leaderboard
-module.exports.showLeaderboard = async (message) => {
+module.exports.showLeaderboard = async (interaction) => {
     try {
         const client = await pool.connect();
 
@@ -97,10 +97,10 @@ module.exports.showLeaderboard = async (message) => {
         client.release();
 
         if (leaderboardData.rows.length === 0) {
-            return message.channel.send("No bumps recorded yet.");
+            return interaction.editReply("No bumps recorded yet.");
         }
 
-        const topUser = leaderboardData.rows[0]; // Get the top-ranked user
+        const topUser = leaderboardData.rows[0];
         const cheerMessage = `🎉 **${topUser.username} is leading the bump race! Keep it up!** 🚀`;
 
         const leaderboardEmbed = new EmbedBuilder()
@@ -112,10 +112,10 @@ module.exports.showLeaderboard = async (message) => {
                     .join("\n") + `\n\n${cheerMessage}\n\n**Keep bumping to rank up!**`
             );
 
-        message.channel.send({ embeds: [leaderboardEmbed] });
+        interaction.editReply({ embeds: [leaderboardEmbed] });
 
     } catch (error) {
         console.error("❌ Error fetching bump leaderboard:", error);
-        message.channel.send("An error occurred while retrieving the bump leaderboard.");
+        interaction.editReply("An error occurred while retrieving the bump leaderboard.");
     }
 };
